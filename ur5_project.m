@@ -23,7 +23,8 @@ elseif strcmpi(type, "DK")
     K = 0.25;
     run_ur5RRcontrol(gst_1, gst_2, K, ur5);
 elseif strcmpi(type, "gradient")
-    return
+    K = 0.25;
+    run_ur5TJcontrol(gst_1, gst_2, K, ur5); 
 else
     disp("Invalid algorithm type. Options are: 'IK, DK, or gradient.'");
 end

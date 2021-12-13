@@ -1,4 +1,4 @@
-function finalerr = run_ur5TJcontrol(g_init, g_final, K, ur5)
+function finalerr = run_ur5TJcontrol(g_init, g_final, K, home, ur5)
     % Create hovering frames
     hover = 0.5; 
     hover_init = g_init;

@@ -1,6 +1,7 @@
 % UR5 Stuff
 ur5 = ur5_interface();
-home = [0 0 0 0 0 0]; % FIX
+joints_home = [0 0 0 0 0 0]; % FIX
+home = ur5FwdKin(joints_home);
 ur5.move_joints(home, 10);
 pause(10); 
 
@@ -18,13 +19,13 @@ gst_2 = [0 -1 0 -0.3; -1 0 0 0.39; 0 0 -1 0.22; 0 0 0 1];
 type = input("Choose algorithm type: IK, DK, or gradient"); 
 
 if strcmpi(type, "IK")
-    ur5IKcontrol(gst_1, gst_2, ur5); 
+    ur5IKcontrol(gst_1, gst_2, home, ur5); 
 elseif strcmpi(type, "DK")
     K = 0.25;
-    run_ur5RRcontrol(gst_1, gst_2, K, ur5);
+    run_ur5RRcontrol(gst_1, gst_2, K, home, ur5);
 elseif strcmpi(type, "gradient")
     K = 0.25;
-    run_ur5TJcontrol(gst_1, gst_2, K, ur5); 
+    run_ur5TJcontrol(gst_1, gst_2, K, home, ur5); 
 else
     disp("Invalid algorithm type. Options are: 'IK, DK, or gradient.'");
 end

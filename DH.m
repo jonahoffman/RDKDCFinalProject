@@ -7,9 +7,9 @@ function [ G ] = DH( a, alpha, d, theta )
     Ta = eye(4);
     Ta(1,4) = a;
     Rtheta = eye(4);
-    Rtheta(1:3, 1:3) = ROTZ(theta);
+    Rtheta(1:3, 1:3) = ROTZ(theta, false);
     Ralpha = eye(4);
-    Ralpha(1:3, 1:3) = ROTX(alpha);
+    Ralpha(1:3, 1:3) = ROTX(alpha, false);
     G = Td * Rtheta * Ta * Ralpha;
 end
 

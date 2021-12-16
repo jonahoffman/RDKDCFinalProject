@@ -1,6 +1,6 @@
 function error = ur5IKcontrol(gdesired, ur5)
     % Set step size based on larger of degrees or distance:
-    mani_limit = 0.005;
+    mani_limit = 0.001;
     n = 100; 
     frame = tf_frame('base_link', 'desired_pose', gdesired); 
     q_current = ur5.get_current_joints();
@@ -34,6 +34,7 @@ function error = ur5IKcontrol(gdesired, ur5)
         jacob = ur5BodyJacobian(updated_q); 
         mu = manipulability(jacob, "sigmamin");
         if mu < mani_limit
+            disp("Singularity found - aborting.");
             error = -1;
             return
         end

@@ -1,7 +1,7 @@
 function finalerr = run_ur5IKcontrol(g_init, g_final, home, ur5)
     
     % Create hovering frames
-    hover = 0.2; 
+    hover = 0.1; 
     hover_init = g_init;
     hover_init(3,4) = hover_init(3,4) + hover;
     hover_final = g_final;

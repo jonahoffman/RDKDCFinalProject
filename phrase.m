@@ -17,22 +17,26 @@ classdef phrase
         liftedHeight;
         downHeight;
         endeffectorspeed;
+        maxjointspeed;
         writepose;
+        homepose;
     end
     
     methods
-        function obj = phrase(inputPhrase,robot, sim)
+        function obj = phrase(inputPhrase,robot)
             obj.text = inputPhrase;
             obj.robot = robot;
             
             
-            obj.innerR = 100;
-            obj.outerR = 300;
+            obj.innerR = 0.4;
+            obj.outerR = 0.6;
             obj.defaultH = 1;
-            obj.liftedHeight = 40;
-            obj.downHeight = 5;
-            obj.endeffectorspeed = 20; %(units/sec)
-            obj.writepose = [1 0 0; 0 1 0; 0 0 1];
+            obj.liftedHeight = 0.08;
+            obj.downHeight = 0.00;
+            obj.endeffectorspeed = 0.2; %(units/sec)
+            obj.maxjointspeed = 0.3; %(rad/s)
+            obj.writepose = quat2rotm([0 1 0 0]);
+            obj.homepose = [1.2673 -0.9105 1.9728 -2.6330 -1.5708 -0.3034]';
             
             
             
@@ -41,7 +45,7 @@ classdef phrase
             obj.spaceW = curLetter.maxWidth * 0.4;
             obj = obj.getOrigin();
             
-            obj.draw(sim);
+            %obj.draw(sim);
         end
         
         function w = getMaxW(obj,arr)
@@ -114,20 +118,32 @@ classdef phrase
             obj.h = y;
             
             obj.points = obj.scale(obj.points, y);
+            obj.points(:,1) = obj.points(:,1) + obj.origin(1);
+            obj.points(:,2) = obj.points(:,2) + obj.origin(2);
         end
         
         function outputPoints = write(obj, h)
             
             xpos = 0;
-            outputPoints = [-1 -1 -1; -1 -1 -2];
+            delim = [-1 -1 -1; -1 -1 -2];
+            outputPoints = delim;
             
             for i = 1:numel(obj.text)
                 curLetter = letter(obj.text(i),h);
                 cur = curLetter.points;
                 cur(:,1) = cur(:,1) + xpos;
                 xpos = xpos+curLetter.maxWidth+obj.spaceW;
-                outputPoints = [outputPoints; cur];
+                outputPoints = [outputPoints; delim; cur];
             end
+        end
+        
+        function home(obj)
+            %get current joint config
+            qcur = obj.robot.get_current_joints();
+            maxqerr = max(abs(obj.homepose - qcur));
+            Tstep = maxqerr / obj.maxjointspeed;
+            obj.robot.move_joints(obj.homepose, Tstep);
+            pause(Tstep);
         end
         
         function draw(obj, mplot)
@@ -155,24 +171,35 @@ classdef phrase
                 for i = 1:size(obj.points,1)
                     pause(0.01)
                     if obj.points(i,3) == 1
-                        scatter(obj.points(i,1)+obj.origin(1),obj.points(i,2)+obj.origin(2))
+                        scatter(obj.points(i,1),obj.points(i,2))
                     end
                 end
                 hold off
                 
             elseif strcmp(mplot, 'rviz')
                 
-                for i = 1:size(obj.points,1)
+                
+                
+                x = obj.points(5,1);
+                y = obj.points(5,2);    
+                        
+                obj.moveto(x, y, 1, 0);
+                obj.moveDown(0);
+                
+                lifted = 0;
+                
+                for i = 5:(size(obj.points,1)-1)
                     
-                    lifted = 0;
-                    
+                    disp(obj.points(i,:));
+                                        
                     if obj.points(i,3) == -1
-                        i = i + 1;
-                        if obj.points(i, 3) == -2
-                            obj.liftStraightUp();
-                            i = i + 1;
-                            lifted = 1;
-                        end
+                        disp('end of stroke');
+                    end
+                    
+                    if obj.points(i, 3) == -2
+                        disp('lifting pen');
+                        obj.liftStraightUp(0);
+                        lifted = 1;
                     end
                     
                     if obj.points(i,3) == 1
@@ -180,31 +207,56 @@ classdef phrase
                         x = obj.points(i,1);
                         y = obj.points(i,2);
                         
-                        obj.moveto(x, y, lifted);
+                        if lifted == 1
+                            obj.moveto(x, y, 1, 0);
+                            obj.moveDown(i);
+                            lifted = 0;
+                        else
+                            obj.moveto(x, y, 0, i);
+                        end
                         
                     end
                 end
+                
+                obj.liftStraightUp(0);
+                obj.home()
             
             end
         end
         
-        function liftStraightUp(obj)
+        function liftStraightUp(obj, marker)
             
             %get current position
             %move to lifted position based on const parameter
             %use obj.moveto
             
+            qcur = obj.robot.get_current_joints();
+            gcur = ur5FwdKin(qcur);
+             
+            xcur = gcur(1,4);
+            ycur = gcur(2,4);
+            
+            obj.moveto(xcur,ycur, 1, marker);
+            
         end
         
-        function moveDown(obj)
+        function moveDown(obj, marker)
             
             %get current position
             %move to down position based on const parameter
             %use obj.moveto
+            qcur = obj.robot.get_current_joints();
+            gcur = ur5FwdKin(qcur);
+             
+            xcur = gcur(1,4);
+            ycur = gcur(2,4);
+            
+            obj.moveto(xcur,ycur, 0, marker);
+            
             
         end
         
-        function moveto(obj, x, y, lifted)
+        function moveto(obj, x, y, lifted, marker)
             
             ztarget = obj.downHeight;
             
@@ -212,18 +264,66 @@ classdef phrase
                 ztarget = obj.liftedHeight;
             end
             
-            %get current position (xcur, ycur, zcur)
             
+            %get current position (xcur, ycur, zcur)
+            qcur = obj.robot.get_current_joints();
+            gcur = ur5FwdKin(qcur);
+            
+            xcur = gcur(1,4);
+            ycur = gcur(2,4);
+            zcur = gcur(3,4);
+
             dist = norm([x-xcur y-ycur ztarget-zcur]);
             Tstep = dist/obj.endeffectorspeed;
+            %disp(dist);
+            %disp(Tstep);
             
             g = [obj.writepose [x y ztarget]'; [0 0 0 1]];
             
+            %disp(g);
+            
             %move to (g)
             
-            if lifted
-                obj.moveDown()
+            qpos = ur5InvKin(g);
+            qdiff = 1000;
+            index = 0;
+            for i = 1:size(qpos,2)
+                a = norm(qpos(:,i) - qcur);
+                if qdiff > a
+                    qdiff = a;
+                    index = i;
+                end
             end
+            
+            %disp([qcur';qpos(:,index)']);
+            
+            maxqerr = max(abs(qpos(:,index) - qcur));
+            if obj.maxjointspeed < (maxqerr / Tstep)
+                %disp('using joint max speed')
+                Tstep = maxqerr / obj.maxjointspeed;
+            end
+            
+            if marker ~= 0
+            
+                framename = string(marker);
+                Frame = tf_frame('base_link',framename,g);
+                
+            end
+            
+            
+            obj.robot.move_joints(qpos(:,index), Tstep);
+            pause(Tstep);
+
+%             g = [obj.writepose [x y ztarget]'; [0 0 0 1]];
+%             
+%             disp(g);
+             
+%             
+%             ur5RRcontrol(g, obj.K, obj.robot);
+            
+%            if lifted
+%                obj.moveDown()
+%            end
             
         end
     end

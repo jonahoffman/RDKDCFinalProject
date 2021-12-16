@@ -34,14 +34,17 @@ disp("Click figure to start motion.");
 w = waitforbuttonpress;
 
 if strcmpi(type, "IK")
-    run_ur5IKcontrol(gst_1, gst_2, home, ur5); 
+    err = run_ur5IKcontrol(gst_1, gst_2, home, ur5); 
 elseif strcmpi(type, "DK")
     K = 1.5;
-    run_ur5RRcontrol(gst_1, gst_2, K, home, ur5);
+    err = run_ur5RRcontrol(gst_1, gst_2, K, home, ur5);
 elseif strcmpi(type, "gradient")
     K = 0.5;
-    run_ur5TJcontrol(gst_1, gst_2, K, home, ur5); 
+    err = run_ur5TJcontrol(gst_1, gst_2, K, home, ur5); 
 else
     disp("Invalid algorithm type. Options are: 'IK, DK, or gradient.'");
 end
+
+disp("Error: \n");
+disp(err);
     

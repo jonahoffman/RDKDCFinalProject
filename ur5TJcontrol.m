@@ -7,8 +7,10 @@ function finalerr = ur5TJcontrol(gdesired, K, ur5)
     mani_limit = 0.005; % (unitless)
     tool_frame = [ROTX(-pi/2, false)*ROTY(pi/2, false) [0 0 0]'; 0 0 0 1];
     gtool = gdesired * tool_frame; 
+    tool2gripper = ROTZ(pi/2, true);
+    tool2gripper(3,4) = 0.13; 
     q_current = ur5.get_current_joints(); 
-    frame = tf_frame('base_link', 'desired_pose', gdesired); 
+    frame = tf_frame('base_link', 'desired_pose', gdesired*tool2gripper); 
     while (1<2)
         % Get joint position and calculate fkin / jacobian
         g_st = ur5FwdKin(q_current);

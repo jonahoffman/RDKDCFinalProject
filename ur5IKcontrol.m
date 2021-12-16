@@ -2,7 +2,9 @@ function error = ur5IKcontrol(gdesired, ur5)
     % Set step size based on larger of degrees or distance:
     mani_limit = 0.001;
     n = 100; 
-    frame = tf_frame('base_link', 'desired_pose', gdesired); 
+    tool2gripper = ROTZ(pi/2, true);
+    tool2gripper(3,4) = 0.13; 
+    frame = tf_frame('base_link', 'desired_pose', gdesired*tool2gripper); 
     q_current = ur5.get_current_joints();
     q_target = ur5InvKin(gdesired);
     norms = zeros(8);

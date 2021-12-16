@@ -19,11 +19,13 @@ classdef phrase
         endeffectorspeed;
         maxjointspeed;
         writepose;
-        homepose;
+        homeposejoints;
+        gripperPose;
+        K;
     end
     
     methods
-        function obj = phrase(inputPhrase,robot)
+        function obj = phrase(inputPhrase,robot, K)
             obj.text = inputPhrase;
             obj.robot = robot;
             
@@ -31,12 +33,18 @@ classdef phrase
             obj.innerR = 0.4;
             obj.outerR = 0.6;
             obj.defaultH = 1;
-            obj.liftedHeight = 0.08;
-            obj.downHeight = 0.00;
+            obj.liftedHeight = 0.1;
+            obj.downHeight = 0.05;
             obj.endeffectorspeed = 0.2; %(units/sec)
             obj.maxjointspeed = 0.3; %(rad/s)
+            obj.K = K;
             obj.writepose = quat2rotm([0 1 0 0]);
-            obj.homepose = [1.2673 -0.9105 1.9728 -2.6330 -1.5708 -0.3034]';
+            obj.homeposejoints = [1.2900 -1.1000 1.4200 -1.9478 -1.5080 -0.1257]';
+            
+            obj.gripperPose = [-0.0000   -1.0000    0.0000   -0.0002;...
+                                1.0000   -0.0000    0.0099    0.0013;...
+                               -0.0099    0.0000    1.0000    0.1303;...
+                                0         0         0         1.0000];
             
             
             
@@ -137,13 +145,15 @@ classdef phrase
             end
         end
         
-        function home(obj)
+        function homenoRR(obj)
+
             %get current joint config
             qcur = obj.robot.get_current_joints();
-            maxqerr = max(abs(obj.homepose - qcur));
+            maxqerr = max(abs(obj.homeposejoints - qcur));
             Tstep = maxqerr / obj.maxjointspeed;
-            obj.robot.move_joints(obj.homepose, Tstep);
+            obj.robot.move_joints(obj.homeposejoints, Tstep);
             pause(Tstep);
+            
         end
         
         function draw(obj, mplot)
@@ -178,7 +188,9 @@ classdef phrase
                 
             elseif strcmp(mplot, 'rviz')
                 
-                
+                disp('moving to default home');
+                obj.homenoRR();
+                disp('finished homing');
                 
                 x = obj.points(5,1);
                 y = obj.points(5,2);    
@@ -212,14 +224,16 @@ classdef phrase
                             obj.moveDown(i);
                             lifted = 0;
                         else
+                            disp('drawing point ' + string(i) + ' out of ' + string(size(obj.points,1)-1));
                             obj.moveto(x, y, 0, i);
                         end
                         
                     end
                 end
                 
+                disp('writing complete!')
+                
                 obj.liftStraightUp(0);
-                obj.home()
             
             end
         end
@@ -258,74 +272,23 @@ classdef phrase
         
         function moveto(obj, x, y, lifted, marker)
             
-            ztarget = obj.downHeight;
+            ztarget = obj.downHeight + obj.gripperPose(3,4);
             
             if lifted
-                ztarget = obj.liftedHeight;
+                ztarget = obj.liftedHeight + obj.gripperPose(3,4);
             end
-            
-            
-            %get current position (xcur, ycur, zcur)
-            qcur = obj.robot.get_current_joints();
-            gcur = ur5FwdKin(qcur);
-            
-            xcur = gcur(1,4);
-            ycur = gcur(2,4);
-            zcur = gcur(3,4);
-
-            dist = norm([x-xcur y-ycur ztarget-zcur]);
-            Tstep = dist/obj.endeffectorspeed;
-            %disp(dist);
-            %disp(Tstep);
             
             g = [obj.writepose [x y ztarget]'; [0 0 0 1]];
             
-            %disp(g);
-            
-            %move to (g)
-            
-            qpos = ur5InvKin(g);
-            qdiff = 1000;
-            index = 0;
-            for i = 1:size(qpos,2)
-                a = norm(qpos(:,i) - qcur);
-                if qdiff > a
-                    qdiff = a;
-                    index = i;
-                end
-            end
-            
-            %disp([qcur';qpos(:,index)']);
-            
-            maxqerr = max(abs(qpos(:,index) - qcur));
-            if obj.maxjointspeed < (maxqerr / Tstep)
-                %disp('using joint max speed')
-                Tstep = maxqerr / obj.maxjointspeed;
-            end
+
+            err = ur5RRcontrol(g, obj.K, obj.robot,0);
+            %disp(err)
             
             if marker ~= 0
-            
                 framename = string(marker);
-                Frame = tf_frame('base_link',framename,g);
-                
+                Frame = tf_frame('base_link',framename,g*obj.gripperPose);
             end
-            
-            
-            obj.robot.move_joints(qpos(:,index), Tstep);
-            pause(Tstep);
-
-%             g = [obj.writepose [x y ztarget]'; [0 0 0 1]];
-%             
-%             disp(g);
-             
-%             
-%             ur5RRcontrol(g, obj.K, obj.robot);
-            
-%            if lifted
-%                obj.moveDown()
-%            end
             
         end
     end
 end
-

@@ -1,4 +1,4 @@
-function finalerr = ur5RRcontrol(gdesired, K, ur5)
+function finalerr = ur5RRcontrol(gdesired, K, ur5, drawDesired)
 % Implements a resolved-rate control system for the UR5 robot. 
 
     t_step= 0.5; % time step (s)
@@ -9,7 +9,10 @@ function finalerr = ur5RRcontrol(gdesired, K, ur5)
     tool2gripper(3,4) = 0.13; 
     % gtool = gdesired * tool_frame; 
     q_current = ur5.get_current_joints();
-    frame = tf_frame('base_link', 'desired_pose', gdesired*tool2gripper); 
+    
+    if drawDesired
+        frame = tf_frame('base_link', 'desired_pose', gdesired*tool2gripper); 
+    end
     while (1<2)
         % Get joint position and calculate fkin / jacobian
         g_st = ur5FwdKin(q_current);

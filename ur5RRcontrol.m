@@ -5,18 +5,19 @@ function finalerr = ur5RRcontrol(gdesired, K, ur5, drawDesired)
     vk_min = 0.01; % (cm)
     wk_min = 1*pi/180; % (rad)
     mani_limit = 0.001; % (unitless)
+    % Set tool to gripper transform:
     tool2gripper = ROTZ(pi/2, true);
     tool2gripper(3,4) = 0.13; 
-    % gtool = gdesired * tool_frame; 
+    % Get current joint config and create desired gripper frame:
     q_current = ur5.get_current_joints();
     
     if drawDesired
         frame = tf_frame('base_link', 'desired_pose', gdesired*tool2gripper); 
     end
     while (1<2)
-        % Get joint position and calculate fkin / jacobian
+        % Get joint position::
         g_st = ur5FwdKin(q_current);
-        dist = abs(norm(g_st(1:3,4) - gdesired(1:3,4)));
+        % Implement check to see if robot crosses floor:
         if g_st(3,4) < 0
             disp("Floor contact warning."); 
             q_new = q_current + [0 pi/6 0 0 0 0]';
@@ -24,8 +25,7 @@ function finalerr = ur5RRcontrol(gdesired, K, ur5, drawDesired)
             g_new = ur5FwdKin(q_new);
             err = ur5RRcontrol(g_new, K, ur5);
         end
-        
-        Jb = ur5BodyJacobian(q_current); 
+        % Implement rough check to avoid joint 3 singularity:
         if abs(q_current(3)) < 0.2
             disp("Avoiding pot. joint 3 sing.");
             new_q = q_current + [0 0 -abs(q_current(3))*2 0 0]';
@@ -35,7 +35,8 @@ function finalerr = ur5RRcontrol(gdesired, K, ur5, drawDesired)
             new_q = q_current + [0 0 (-(abs(q_current(3))*2 - pi))  0 0]'; 
             ur5.move_joints(new_q, 5);
         end
-        % Calculate manipulability
+        % Calculate jacobian and manipulability:
+        Jb = ur5BodyJacobian(q_current);
         sigma = manipulability(Jb, 'sigmamin');
         
         % Check for singularity and cease operation if found
@@ -50,6 +51,7 @@ function finalerr = ur5RRcontrol(gdesired, K, ur5, drawDesired)
         s = gdesired\g_st;
         xi = getXi(s);
         vk = norm(xi(1:3));
+        % Shorten path if long distance, avoid odd motion:
         if vk > 0.5
             xi = xi/4;
         end
@@ -68,6 +70,7 @@ function finalerr = ur5RRcontrol(gdesired, K, ur5, drawDesired)
         end
         q_current = ur5.get_current_joints(); 
     end
+    % Get current pose and compute both types of error:
     current_pose = ur5FwdKin(q_current);
     R = current_pose(1:3, 1:3);
     R_d = gdesired(1:3, 1:3);

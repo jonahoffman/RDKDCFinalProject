@@ -20,7 +20,7 @@ function finalerr = run_ur5IKcontrol(g_init, g_final, home, ur5)
     finalerr(2,:) = ur5IKcontrol(g_init, ur5); 
     % Robot moves back to initial location (above inital).
     finalerr(3,:) = ur5IKcontrol(hover_init, ur5);
-    % Robot moves above the target location. 
+    % Robot moves to home and then above the target location. 
     finalerr(4,:) = ur5IKcontrol(home, ur5);
     finalerr(5,:) = ur5IKcontrol(hover_final, ur5);
     % Robot moves down to end location.

@@ -2,7 +2,7 @@ function output = strokeline(ax, ay, bx, by)
 %LINE Summary of this function goes here
 %   Detailed explanation goes here
 
-    n = 20;
+    n = 10;
     
     if ax > bx
         x = bx:(abs(ax-bx))/n:ax;

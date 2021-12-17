@@ -1,6 +1,6 @@
 function output = arc(startAng, endAng, r, centerX, centerY, ccw)
 
-    n = 30;
+    n = 20;
 
     theta = 0:2*pi/n:2*pi;
     circle = nan(numel(theta), 2);

@@ -1,8 +1,13 @@
 classdef letter
-    %LETTER Summary of this class goes here
-    %   Detailed explanation goes here
+    %LETTER a class that represents each letter of the lower case alphabet
+    %as a sequence of point coordinates. This class is instanced for each
+    %letter drawn, including space.
     
     properties
+        
+        %storing object values, including dimensional data that will be
+        %used by the 'phrase' class to determine the coordinates and
+        %positioning of each letter in the phrase.
         char;
         height;
         maxWidth;
@@ -13,13 +18,14 @@ classdef letter
     methods
         function obj = letter(char,h)
             %LETTER Construct an instance of this class
-            %   Detailed explanation goes here
             obj.char = char;
             obj.height = h;
             obj.lowerRatio = (1/1.6);
+            %call function to populate the points field
             obj = obj.writeLetter();
         end
         
+        %helper: get the max width of a pen stroke
         function w = getMaxW(obj,arr)
             A = arr;
             A(A(:, 3)== -1, :)= [];
@@ -28,6 +34,7 @@ classdef letter
             w = maxX - minX;
         end
         
+        %helpers: shift a point set vertically and horizontally by a value
         function A = shiftVertical(obj, arr, y)
             A = arr;
             for i = 1:size(arr,1)
@@ -36,7 +43,6 @@ classdef letter
                 end
             end
         end
-        
         function A = shiftHorizontal(obj, arr, x)
             A = arr;
             for i = 1:size(arr,1)
@@ -46,6 +52,7 @@ classdef letter
             end
         end
         
+        %helper: scale the stroke or any point set
         function A = scaleStroke(obj, arr, x, y)
             A = arr;
             for i = 1:size(arr,1)
@@ -56,21 +63,34 @@ classdef letter
             end
         end
             
-        
+        %generate the points of the letter.
+        %The points are sequentially built by calling a specific set of
+        %pen stroke instructions for each letter, hardcoded in this
+        %function. 
         function obj = writeLetter(obj)
             
+            %output is an array with the output points so far, each pen
+            %stroke will be sequentially added to the output array
             output = nan(1,3);
 
+            %determining some constants to help the scaling of the letters
             a = obj.height*obj.lowerRatio;
             b = obj.height*(1-obj.lowerRatio) / 2;
-            
             dotR = 0.02;
             
+            %adding a row vector to indicate lifting of a pen. Sometimes if
+            %the starting point of stroke 1 and ending point of stroke 2 coincide (in e for example), the robot can continue to the stroke without lifting the pen 
+            %if the pen actually does need to be lifted to create disjoint,
+            %we concatenate this row vector as a signal
             liftPen = [0 0 -2];
-            
-            %disp(a)
-            %disp(b)
 
+            
+            %define instructions for each letter
+            %for example, the letter 'a' is written this way:
+            %first, start with a partial circle (arc stroke) in CCW from
+            %top right to bottom right. Lift the pen
+            %then, draw a straight line from the bottom right corner to the
+            %top right corner.
             if obj.char == 'a'
                 stroke1 = stroke(arc(pi/5, 2*pi-pi/5, a/2, a/2, a/2, 1));
                 output = stroke1.getPoints();
@@ -80,6 +100,7 @@ classdef letter
                 output = obj.shiftVertical(output,b);
             end
             
+            %so on for each letter
             if obj.char == 'b'
                 stroke1 = stroke(arc(pi+pi/5, pi-pi/5, a/2, a/2, a/2, 1));
                 output = stroke1.getPoints();
@@ -328,6 +349,10 @@ classdef letter
             
             
             
+            %for spaces, we still use this object to represent the stroke,
+            %but the points output will just be empty, while the object
+            %still has a 'width' that the hgiher level planner still needs
+            %to accomodate for.
             if obj.char == ' '
                 obj.maxWidth = 0.6*a;
                 obj.points = [-1 -1 -1];

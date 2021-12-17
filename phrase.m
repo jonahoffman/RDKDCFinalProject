@@ -1,61 +1,75 @@
 classdef phrase
-    %PHRASE Summary of this class goes here
-    %   Detailed explanation goes here
+    %PHRASE An object to represent the collection of letter objects, also
+    %provides functions to plan out the overall wirting motion between
+    %letters as well as actually executing the motion plan
+    %Here for controls, we use RRControl to perfrom the writing
     
     properties
-        text;
-        robot;
-        origin;
-        ratio;
-        points;
-        w;
-        h;
-        innerR;
-        outerR;
-        spaceW;
-        defaultH;
-        liftedHeight;
-        downHeight;
-        endeffectorspeed;
-        maxjointspeed;
-        writepose;
-        homeposejoints;
-        gripperPose;
-        K;
+        text; %the inputted text to write
+        robot; %ur5_interface object
+        points; %the concatenated point path for the given phrase, in the form of a nx3 matrix
+        
+        % Variables used to determine the largest writing box for a given
+        % phrase
+        origin; %the bottom left corner coordinates
+        ratio; %length ratio of the box containing the phrase written out
+        w; %overall width of bounding box after scaling
+        h; %height after scaling
+        
+        %variables defining the workspace of the ur5
+        innerR; %the inner radius of the circle where the ur5 can write, determined experimentally
+        outerR; %the outer radius o            %disp(err)f the circle where the ur5 can write, determined experimentally
+        
+        
+        spaceW; %the amount of x offset when there is a space
+        
+        
+        liftedHeight; %desired z offset distance from the 'table' when the 'pen' should be lifted
+        downHeight; %desired z offset distance from the 'table' when the 'pen' should be down on the paper
+        
+        maxjointspeed; %max joint speed for homing 
+        homeposejoints; %homing joint config
+        
+        writepose; %the rotational component of the end effector frame wrt to base_frame during writing 
+        gripperPose; %the frame transform from tool0 to gripper frame, for calculating z offset
+        
+        K; %RRControl Gain
     end
     
     methods
         function obj = phrase(inputPhrase,robot, K)
+            %When initializing, caller provides the word, ur5 object, and a
+            %control gain constant
+            
+            
             obj.text = inputPhrase;
             obj.robot = robot;
-            
-            
-            obj.innerR = 0.4;
-            obj.outerR = 0.6;
-            obj.defaultH = 1;
-            obj.liftedHeight = 0.1;
-            obj.downHeight = 0.05;
-            obj.endeffectorspeed = 0.2; %(units/sec)
-            obj.maxjointspeed = 0.3; %(rad/s)
             obj.K = K;
-            obj.writepose = quat2rotm([0 1 0 0]);
-            obj.homeposejoints = [1.2900 -1.1000 1.4200 -1.9478 -1.5080 -0.1257]';
             
+            
+            %Environmental and ur5 constants
+            obj.innerR = 0.4; %Inner and outer radii of workspace determined experimentally
+            obj.outerR = 0.6;
+            obj.liftedHeight = 0.1; %arbitrary z height for when the 'pen' is lifted
+            obj.downHeight = 0.05; %same for when it is down. Recommend avoiding 0 since that will trigger RRcontrol's floor avoidance logic
+            obj.maxjointspeed = 0.3; %(rad/s), only used for homing without RRcontrol
+            obj.writepose = quat2rotm([0 1 0 0]); %pose of the end effector during writing
+            obj.homeposejoints = [1.2900 -1.1000 1.4200 -1.9478 -1.5080 -0.1257]'; %default home pose
             obj.gripperPose = [-0.0000   -1.0000    0.0000   -0.0002;...
                                 1.0000   -0.0000    0.0099    0.0013;...
                                -0.0099    0.0000    1.0000    0.1303;...
                                 0         0         0         1.0000];
             
-            
-            
-            
-            curLetter = letter('o',obj.defaultH);
+            %finding the proper x offset for spaces
+            curLetter = letter('o',1);
             obj.spaceW = curLetter.maxWidth * 0.4;
+
+            %call getOrigin function to populate the remaining fields (including scaled points, path, origin coordinates, etc.)
             obj = obj.getOrigin();
-            
-            %obj.draw(sim);
         end
         
+        %fucntion for getting the overall width of a letter or any
+        %path array
         function w = getMaxW(obj,arr)
             A = arr;
             A(A(:, 3)== -1, :)= [];
@@ -65,6 +79,7 @@ classdef phrase
             w = maxX - minX;
         end
         
+        %same but for height
         function h = getMaxH(obj,arr)
             A = arr;
             A(A(:, 3)== -1, :)= [];
@@ -74,6 +89,8 @@ classdef phrase
             h = maxH - minH;
         end
         
+        %scale a set of points by a constant, without changing the point
+        %'mode' in column 3
         function A = scale(obj, arr, c)
             A = arr;
             for i = 1:size(arr,1)
@@ -84,24 +101,29 @@ classdef phrase
             end
         end
         
+        %find the length ratio of the input letters
         function obj = findRatio(o)
             obj = o;
             
-            points = obj.write(obj.defaultH);
+            points = obj.write(1);
             w = obj.getMaxW(points);
-            h = obj.defaultH;
+            h = 1;
             
             obj.ratio = w/h;
             obj.points = points;
             
         end
         
+        %get the origin of the scaled bounding box, this will be the bottom
+        %left corner of the box
         function obj = getOrigin(o)
             obj = o;
             obj = obj.findRatio();
             obj = obj.findMaxBox();
         end
         
+        %given a width/height ratio, determine the origin coordinates and
+        %adjust the point paths to this new 2D frame
         function obj = findMaxBox(o)
             obj = o;
             m = obj.ratio/2;
@@ -130,6 +152,9 @@ classdef phrase
             obj.points(:,2) = obj.points(:,2) + obj.origin(2);
         end
         
+        
+        %given a phrase the write, build the point path with a default
+        %height. This will be scaled and translated later.
         function outputPoints = write(obj, h)
             
             xpos = 0;
@@ -145,9 +170,15 @@ classdef phrase
             end
         end
         
+        % Homing function for the robot, even when it is initialized in a
+        % singularity position by directly using move_joints. 
+        % Recommended that this function be called before attempting
+        % anything involving RRcontrol
         function homenoRR(obj)
 
-            %get current joint config
+            %get current joint config, use the maxjointspeed to determine
+            %what the duration of the movement should be, then call
+            %move_joints
             qcur = obj.robot.get_current_joints();
             maxqerr = max(abs(obj.homeposejoints - qcur));
             Tstep = maxqerr / obj.maxjointspeed;
@@ -156,8 +187,13 @@ classdef phrase
             
         end
         
+        % High-level function for actually drawing the phrase.
+        % there are 2 modes, one draws the points in context of a 2D
+        % representation of the ur5's workspace in matlab ('mplot' arg),
+        % the other draws it in rviz
         function draw(obj, mplot)
             
+            %draw phrase in matlab 2D plot
             if strcmp(mplot, 'mplot')
             
                 hold on
@@ -186,11 +222,8 @@ classdef phrase
                 end
                 hold off
                 
+            %draw the phrase in 3D (including lifting pen/putting down pen for stroke ending) in rviz
             elseif strcmp(mplot, 'rviz')
-                
-                disp('moving to default home');
-                obj.homenoRR();
-                disp('finished homing');
                 
                 x = obj.points(5,1);
                 y = obj.points(5,2);    
@@ -233,11 +266,13 @@ classdef phrase
                 
                 disp('writing complete!')
                 
+                %lift the robot directly up after the last point
                 obj.liftStraightUp(0);
             
             end
         end
         
+        %helper for lifting the robot directly up in +z
         function liftStraightUp(obj, marker)
             
             %get current position
@@ -254,6 +289,7 @@ classdef phrase
             
         end
         
+        %helper for lifting the robot directly down in -z
         function moveDown(obj, marker)
             
             %get current position
@@ -270,6 +306,10 @@ classdef phrase
             
         end
         
+        %Mid level controlling function to move the robot to a 2D
+        %coordinate in either lifted or down position. If marker is
+        %defined, it will instruct rviz to visibly mark the point in the
+        %ismulation. 
         function moveto(obj, x, y, lifted, marker)
             
             ztarget = obj.downHeight + obj.gripperPose(3,4);
@@ -282,7 +322,6 @@ classdef phrase
             
 
             err = ur5RRcontrol(g, obj.K, obj.robot,0);
-            %disp(err)
             
             if marker ~= 0
                 framename = string(marker);

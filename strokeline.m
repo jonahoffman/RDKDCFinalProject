@@ -1,7 +1,9 @@
 function output = strokeline(ax, ay, bx, by)
-%LINE Summary of this function goes here
-%   Detailed explanation goes here
+%LINE Function for generating a 2D line as defined by starting xy and
+%ending xy. The line will be represented as a series of 2D points. 
 
+    %defult number of points in a line. Anything above 20 will make the
+    %drawing process extremely slow. 
     n = 10;
     
     if ax > bx
@@ -21,9 +23,6 @@ function output = strokeline(ax, ay, bx, by)
     else
         y = zeros(1,n+1)+ay;
     end
-    
-    %disp(x')
-    %disp(y')
     
     output = [x' y'];
     

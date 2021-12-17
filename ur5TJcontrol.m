@@ -5,17 +5,17 @@ function finalerr = ur5TJcontrol(gdesired, K, ur5)
     vk_min = 0.01; % (cm)
     wk_min = 1*pi/180; % (rad)
     mani_limit = 0.005; % (unitless)
-    tool_frame = [ROTX(-pi/2, false)*ROTY(pi/2, false) [0 0 0]'; 0 0 0 1];
-    gtool = gdesired * tool_frame; 
+    % Set tool to gripper transform:
     tool2gripper = ROTZ(pi/2, true);
     tool2gripper(3,4) = 0.13; 
+    % Get current joint config and create desired gripper frame:
     q_current = ur5.get_current_joints(); 
     frame = tf_frame('base_link', 'desired_pose', gdesired*tool2gripper); 
     while (1<2)
         % Get joint position and calculate fkin / jacobian
         g_st = ur5FwdKin(q_current);
         Jb = ur5BodyJacobian(q_current); 
-        
+        % Implement check to see if robot crosses floor:
         if g_st(3,4) < 0
             disp("Floor contact warning."); 
             q_new = q_current + [0 pi/6 0 0 0 0]';
@@ -34,7 +34,7 @@ function finalerr = ur5TJcontrol(gdesired, K, ur5)
             return
         end
 
-        % Update positions based on RR-control equations: 
+        % Update positions based on RR-control equations using transpose jacobian: 
         s = gdesired\g_st;
         xi = getXi(s);
         q_next = q_current - K*t_step*transpose(Jb)*xi;
@@ -51,6 +51,7 @@ function finalerr = ur5TJcontrol(gdesired, K, ur5)
         end
         q_current = ur5.get_current_joints(); 
     end
+    % Update current pose and compute both types of error:
     current_pose = ur5FwdKin(q_current);
     R = current_pose(1:3, 1:3);
     R_d = gdesired(1:3, 1:3);

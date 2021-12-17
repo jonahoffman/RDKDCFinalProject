@@ -12,7 +12,7 @@ function finalerr = run_ur5TJcontrol(g_init, g_final, K, home, ur5)
     finalerr(2,:) = ur5TJcontrol(g_init, K, ur5); 
     % Robot moves back to initial location (above inital).
     finalerr(3,:) = ur5TJcontrol(hover_init, K, ur5);
-    % Robot moves above the target location. 
+    % Robot moves home and then above the target location. 
     finalerr(4,:) = ur5TJcontrol(home, K, ur5);
     finalerr(5,:) = ur5TJcontrol(hover_final, K, ur5);
     % Robot moves down to end location.
